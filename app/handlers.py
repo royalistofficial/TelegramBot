@@ -4,7 +4,7 @@ import app.keyboards as kb
 import sqlite3
 from datetime import datetime, timedelta
 from config import ADMIN_IDS
-
+from database.database_manager import database_connection
 
 router = Router()
 
@@ -21,11 +21,10 @@ async def send_info(message: types.Message):
 
 @router.message(lambda message:  message.text == "Анкеты")
 async def show_surveys(message: types.Message):
-    conn = sqlite3.connect('db/mydb.db')
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM survey WHERE user_ip = ?", (message.from_user.id,))
-    surveys = cursor.fetchall()
-    conn.close()
+    with database_connection as cursor:
+        cursor.execute("SELECT * FROM survey WHERE user_ip = ?", (message.from_user.id,))
+        surveys = cursor.fetchall()
+
 
     
     if surveys:
@@ -62,11 +61,10 @@ import sqlite3
 @router.message(lambda message: message.text == "Ожидание")
 async def checked_panel(message: types.Message):
     if message.from_user.id in ADMIN_IDS:
-        conn = sqlite3.connect('db/mydb.db')
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM survey WHERE checked = 0")
-        checked = cursor.fetchall()
-        conn.close()
+        with database_connection as cursor:
+            cursor.execute("SELECT * FROM survey WHERE checked = 0")
+            checked = cursor.fetchall()
+
         
         if checked:
             await message.answer("Найдены следующие записи:\n")
@@ -88,11 +86,9 @@ async def checked_panel(message: types.Message):
 async def process_approve(callback_query: types.CallbackQuery):
     record_id = callback_query.data.split('_')[1]
     
-    conn = sqlite3.connect('db/mydb.db')
-    cursor = conn.cursor()
-    cursor.execute("UPDATE survey SET checked = 1, approved = 1 WHERE id = ?", (record_id,))
-    conn.commit()
-    conn.close()
+    with database_connection as cursor:
+        cursor.execute("UPDATE survey SET checked = 1, approved = 1 WHERE id = ?", (record_id,))
+
     
     await callback_query.answer(f"Запись {record_id} одобрена.")
 
@@ -100,23 +96,19 @@ async def process_approve(callback_query: types.CallbackQuery):
 async def process_reject(callback_query: types.CallbackQuery):
     record_id = callback_query.data.split('_')[1]
     
-    conn = sqlite3.connect('db/mydb.db')
-    cursor = conn.cursor()
-    cursor.execute("UPDATE survey SET checked = 1, approved = 0 WHERE id = ?", (record_id,)) 
-    conn.commit()
-    conn.close()
-    
+    with database_connection as cursor:
+        cursor.execute("UPDATE survey SET checked = 1, approved = 0 WHERE id = ?", (record_id,)) 
+
     await callback_query.answer(f"Запись {record_id} отклонена.")
 
 
 @router.message(lambda message: message.text == "Одобренные")
 async def approved_panel(message: types.Message):
     if message.from_user.id in ADMIN_IDS:
-        conn = sqlite3.connect('db/mydb.db')
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM survey WHERE checked = 1")
-        approved = cursor.fetchall()
-        conn.close()
+        with database_connection as cursor:
+            cursor.execute("SELECT * FROM survey WHERE checked = 1")
+            approved = cursor.fetchall()
+        
         
         if approved:
             await message.answer("Найдены следующие одобренные записи:\n")
@@ -129,17 +121,13 @@ async def approved_panel(message: types.Message):
             await message.answer("Нет записей с состоянием 'Одобрено'.")
 
 @router.message(lambda message: message.text == "Удаление старых запией")
-async def delete_old_records(message: types.Messag):
-    conn = sqlite3.connect('db/mydb.db')
-    cursor = conn.cursor()
-    
-    month_ago = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d %H:%M:%S')
-    
-    cursor.execute('''
-    DELETE FROM survey WHERE time < ?;
-    ''', (month_ago,))
-    cursor.execute('VACUUM;')
-    conn.commit()
-    conn.close()
+async def delete_old_records(message: types.Message):
+    with database_connection as cursor:
+        month_ago = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d %H:%M:%S')
+        cursor.execute('''
+        DELETE FROM survey WHERE time < ?;  -- Убедитесь, что имя столбца корректно
+        ''', (month_ago,))
+        
+        cursor.execute('VACUUM;')
 
     await message.answer("Удаление старых запией закончено")

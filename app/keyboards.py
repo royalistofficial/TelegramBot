@@ -14,7 +14,7 @@ admin_keyboard = ReplyKeyboardMarkup(
     keyboard=[
         [KeyboardButton(text="Одобренные")],
         [KeyboardButton(text="Ожидание")],
-        [KeyboardButton(text="Удаление старых запией")],
+        # [KeyboardButton(text="Удаление старых запией")],
     ],
     resize_keyboard=True,
     input_field_placeholder="Выбери пункт меню."
